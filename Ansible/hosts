@@ -1,0 +1,9 @@
+#[pfsense]
+#192.168.88.32 ansible_user=admin ansible_password=1234
+
+[nginx]
+192.168.1.10 ansible_user=nginx ansible_ssh_pass=1234
+
+[wordpress]
+wp1 ansible_host=192.168.1.11 ansible_user=wp1 ansible_ssh_pass=1234
+wp2 ansible_host=192.168.1.12 ansible_user=wp2 ansible_ssh_pass=1234

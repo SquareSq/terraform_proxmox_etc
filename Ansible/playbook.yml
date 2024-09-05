@@ -1,0 +1,109 @@
+---
+
+- hosts: all
+  become: true
+  tasks:
+    - name: Update and upgrade apt packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+- hosts: nginx
+  become: true
+  tasks:
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+
+    - name: Setup pemission to "default" directory
+      file:
+        path: /etc/nginx/sites-available/default
+        mode: '0777'
+    
+    - name: Setup pemission to sites-enabled directory
+      file:
+        path: /etc/nginx/sites-enabled
+        mode: '0777'
+
+    - name: Deleting the old config file
+      file:
+        path: /etc/nginx/sites-available/default
+        state: absent
+
+    - name: Deleting the old symlink file
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Copying a new config file
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/balancer.conf
+    
+    - name: Creating symbolic link
+      become: true
+      file:
+        src: /etc/nginx/sites-available/balancer.conf
+        dest: /etc/nginx/sites-enabled/balancer.conf
+        state: link
+      notify: 
+        - Restart Nginx
+      
+    - name: Checking Nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+
+
+- hosts: wordpress
+  become: true
+  tasks:
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Install Docker Compose
+      apt:
+        name: docker-compose
+        state: present
+
+    - name: Create docker-compose file for Wordpress
+      copy:
+        dest: /home/{{ inventory_hostname }}/docker-compose.yml
+        content: |
+          version: '3.1'
+
+          services:
+            wordpress:
+              image: wordpress
+              restart: always
+              ports:
+                - "8080:80"
+              environment:
+                WORDPRESS_DB_HOST: db
+                WORDPRESS_DB_USER: wp_user
+                WORDPRESS_DB_PASSWORD: 1234
+                WORDPRESS_DB_NAME: wp_db
+
+            db:
+              image: mysql:5.7
+              restart: always
+              environment:
+                MYSQL_DATABASE: wp_db
+                MYSQL_USER: wp_user
+                MYSQL_PASSWORD: 1234
+                MYSQL_ROOT_PASSWORD: 1234
+
+    - name: Start Wordpress using Docker Compose
+      command: docker-compose -f /home/{{ inventory_hostname }}/docker-compose.yml up -d
+
+
